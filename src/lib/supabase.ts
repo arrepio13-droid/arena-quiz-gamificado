@@ -102,7 +102,14 @@ function getLocalLeaderboard(): DbPlayer[] {
   try {
     const data = localStorage.getItem(LOCAL_LEADERBOARD_KEY);
     if (data) {
-      return JSON.parse(data);
+      let parsed: DbPlayer[] = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        // Remover dados de testes poluídos anteriores
+        parsed = parsed.filter(
+          (p) => p.nickname && p.nickname.toLowerCase() !== 'vcdssfga' && !p.nickname.toLowerCase().includes('vcdss')
+        );
+        return parsed;
+      }
     }
   } catch {
     // ignore
@@ -187,12 +194,19 @@ export async function syncPlayerProfile(player: {
   isWin: boolean;
   correctAnswersToAdd: number;
 }): Promise<{ player: DbPlayer; position: number }> {
+  const cleanNick = (player.nickname || 'Jogador QR').trim();
+  const matchScore = Math.round(Number(player.pointsToAdd) || 0);
+
   // 1. Tentar via servidor backend /api/player/sync
   try {
     const res = await fetch(`${API_BASE}/api/player/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(player),
+      body: JSON.stringify({
+        ...player,
+        nickname: cleanNick,
+        pointsToAdd: matchScore,
+      }),
     });
     if (res.ok) {
       const data = await res.json();
@@ -204,27 +218,29 @@ export async function syncPlayerProfile(player: {
     // Falha de rede ou modo estático, prosseguir para fallback
   }
 
-  // 2. MODO LOCAL / DEMO FALLBACK
+  // 2. MODO LOCAL / DEMO FALLBACK: Cada apelido é um competidor único independente
   const list = getLocalLeaderboard();
-  let existing = list.find((p) => p.id === player.id || p.nickname.toLowerCase() === player.nickname.toLowerCase());
+  let existing = list.find((p) => p.nickname.toLowerCase() === cleanNick.toLowerCase());
 
   if (existing) {
-    existing.total_score += player.pointsToAdd;
-    existing.matches_played += 1;
-    if (player.isWin) existing.wins_count += 1;
-    existing.correct_answers += player.correctAnswersToAdd;
+    // Atualiza com a maior pontuação (recorde pessoal da partida)
+    existing.total_score = Math.max(existing.total_score || 0, matchScore);
+    existing.nickname = cleanNick;
     existing.avatar_id = player.avatarId;
     existing.title_badge = player.titleBadge;
+    existing.matches_played = (existing.matches_played || 1) + 1;
+    if (player.isWin) existing.wins_count = (existing.wins_count || 0) + 1;
+    existing.correct_answers = (existing.correct_answers || 0) + (Number(player.correctAnswersToAdd) || 0);
   } else {
     existing = {
-      id: player.id,
-      nickname: player.nickname,
+      id: `player-${encodeURIComponent(cleanNick.toLowerCase())}`,
+      nickname: cleanNick,
       avatar_id: player.avatarId,
       title_badge: player.titleBadge,
-      total_score: player.pointsToAdd,
+      total_score: matchScore,
       matches_played: 1,
       wins_count: player.isWin ? 1 : 0,
-      correct_answers: player.correctAnswersToAdd,
+      correct_answers: Number(player.correctAnswersToAdd) || 0,
     };
     list.push(existing);
   }
@@ -235,8 +251,72 @@ export async function syncPlayerProfile(player: {
   });
 
   saveLocalLeaderboard(list);
-  const pos = list.findIndex((p) => p.id === existing?.id) + 1;
+  const pos = list.findIndex((p) => p.nickname.toLowerCase() === cleanNick.toLowerCase()) + 1;
   return { player: existing, position: pos || 1 };
+}
+
+/**
+ * Sincroniza todos os participantes da partida no ranking (ex: Alceu, Você, Sr. Chuck),
+ * garantindo que a colocação no pódio e no ranking global fiquem 100% consistentes.
+ */
+export async function syncMatchParticipants(
+  participants: {
+    id: string;
+    nickname: string;
+    avatarId: string;
+    titleBadge: string;
+    score: number;
+    currentRank: number;
+    isLocalPlayer?: boolean;
+    correctCount?: number;
+  }[]
+): Promise<number> {
+  const list = getLocalLeaderboard();
+
+  for (const p of participants) {
+    const cleanNick = (p.nickname || '').trim();
+    if (!cleanNick || cleanNick.toLowerCase() === 'vcdssfga') continue;
+
+    const roundScore = Math.round(Number(p.score) || 0);
+    let item = list.find((x) => x.nickname.toLowerCase() === cleanNick.toLowerCase());
+
+    if (item) {
+      item.total_score = Math.max(item.total_score || 0, roundScore);
+      item.nickname = cleanNick;
+      item.avatar_id = p.avatarId;
+      item.title_badge = p.titleBadge;
+      item.matches_played = (item.matches_played || 1) + 1;
+      if (p.currentRank === 1) item.wins_count = (item.wins_count || 0) + 1;
+      item.correct_answers = (item.correct_answers || 0) + (Number(p.correctCount) || 0);
+    } else {
+      item = {
+        id: `player-${encodeURIComponent(cleanNick.toLowerCase())}`,
+        nickname: cleanNick,
+        avatar_id: p.avatarId,
+        title_badge: p.titleBadge,
+        total_score: roundScore,
+        matches_played: 1,
+        wins_count: p.currentRank === 1 ? 1 : 0,
+        correct_answers: Number(p.correctCount) || 0,
+      };
+      list.push(item);
+    }
+  }
+
+  list.sort((a, b) => b.total_score - a.total_score);
+  list.forEach((p, index) => {
+    p.position = index + 1;
+  });
+
+  saveLocalLeaderboard(list);
+
+  // Retornar a posição global exata do jogador local
+  const localP = participants.find((p) => p.isLocalPlayer);
+  if (localP) {
+    const found = list.find((p) => p.nickname.toLowerCase() === localP.nickname.toLowerCase());
+    return found?.position || localP.currentRank;
+  }
+  return 1;
 }
 
 /**

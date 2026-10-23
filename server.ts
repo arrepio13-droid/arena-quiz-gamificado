@@ -183,15 +183,25 @@ async function startServer() {
         return;
       }
 
+      const cleanNick = String(nickname).trim();
+      const playerId = `player-${encodeURIComponent(cleanNick.toLowerCase())}`;
+
+      // Remover entrada poluída de testes anteriores como vcdssfga
+      if (cleanNick.toLowerCase() !== 'vcdssfga') {
+        await supabase.from('players').delete().eq('nickname', 'vcdssfga').catch(() => {});
+      }
+
       const { data: existingPlayer } = await supabase
         .from('players')
         .select('*')
-        .eq('id', id)
+        .ilike('nickname', cleanNick)
         .maybeSingle();
 
       let updatedPlayer;
       if (existingPlayer) {
-        const newScore = (existingPlayer.total_score || 0) + (Number(pointsToAdd) || 0);
+        // Recorde da partida para não somar pontos com outros participantes
+        const matchScore = Number(pointsToAdd) || 0;
+        const newScore = Math.max(existingPlayer.total_score || 0, matchScore);
         const newMatches = (existingPlayer.matches_played || 0) + 1;
         const newWins = (existingPlayer.wins_count || 0) + (isWin ? 1 : 0);
         const newCorrect = (existingPlayer.correct_answers || 0) + (Number(correctAnswersToAdd) || 0);
@@ -199,7 +209,7 @@ async function startServer() {
         const { data, error } = await supabase
           .from('players')
           .update({
-            nickname,
+            nickname: cleanNick,
             avatar_id: avatarId || 'fox',
             title_badge: titleBadge || 'Competidor QR',
             total_score: newScore,
@@ -208,7 +218,7 @@ async function startServer() {
             correct_answers: newCorrect,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', id)
+          .eq('id', existingPlayer.id)
           .select()
           .single();
 
@@ -218,8 +228,8 @@ async function startServer() {
         const { data, error } = await supabase
           .from('players')
           .insert({
-            id,
-            nickname,
+            id: playerId,
+            nickname: cleanNick,
             avatar_id: avatarId || 'fox',
             title_badge: titleBadge || 'Competidor QR',
             total_score: Number(pointsToAdd) || 0,

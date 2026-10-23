@@ -48,9 +48,9 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Encontrar o jogador atual na lista
+  // Encontrar o jogador atual na lista (estritamente pelo apelido atual)
   const myPlayerEntry = players.find(
-    (p) => p.id === localPlayerId || p.nickname.toLowerCase() === localPlayerNickname.toLowerCase()
+    (p) => p.nickname && p.nickname.toLowerCase() === localPlayerNickname.toLowerCase()
   );
 
   const topThree = players.slice(0, 3);
@@ -222,7 +222,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
             <div className="space-y-2">
               {players.slice(0, 20).map((p) => {
-                const isMe = p.id === localPlayerId || p.nickname.toLowerCase() === localPlayerNickname.toLowerCase();
+                const isMe = Boolean(p.nickname && p.nickname.toLowerCase() === localPlayerNickname.toLowerCase());
                 const pos = p.position || 0;
 
                 return (

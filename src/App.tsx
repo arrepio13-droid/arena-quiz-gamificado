@@ -21,7 +21,7 @@ import { PodiumModal } from './components/PodiumModal';
 import { QuizCreatorModal } from './components/QuizCreatorModal';
 import { HostPresenterModal } from './components/HostPresenterModal';
 import { LeaderboardModal } from './components/LeaderboardModal';
-import { syncPlayerProfile, saveMatchScore } from './lib/supabase';
+import { syncPlayerProfile, syncMatchParticipants, saveMatchScore } from './lib/supabase';
 
 type AppFlowState = 'title' | 'nickname' | 'playing' | 'paused' | 'gameover';
 
@@ -92,9 +92,13 @@ export default function App() {
   // Build initial participants list (local player + competitive rivals)
   const buildInitialParticipants = useCallback(
     (nick: string, avId: string, badge: string): PlayerParticipant[] => {
+      const cleanNick = (nick || 'JogadorQR').trim();
+      const playerId = `player-${encodeURIComponent(cleanNick.toLowerCase())}`;
+      localPlayerIdRef.current = playerId;
+
       const local: PlayerParticipant = {
-        id: localPlayerIdRef.current,
-        nickname: nick || 'JogadorQR',
+        id: playerId,
+        nickname: cleanNick,
         avatarId: avId,
         titleBadge: badge,
         score: 0,
@@ -464,7 +468,15 @@ export default function App() {
         setCareerXp((xp) => xp + Math.round(localP.score / 10) + localP.correctCount * 50);
         setCareerMatches((m) => m + 1);
 
-        // Synchronize with Supabase database & fetch real-time global position
+        // Sincronizar todos os participantes da partida para que o pódio e o ranking fiquem 100% alinhados
+        syncMatchParticipants(participants)
+          .then((pos) => {
+            setGlobalRankPosition(pos);
+          })
+          .catch(() => {
+            setGlobalRankPosition(localP.currentRank);
+          });
+
         const isWin = localP.currentRank === 1;
         syncPlayerProfile({
           id: localP.id,
@@ -474,13 +486,9 @@ export default function App() {
           pointsToAdd: Math.round(localP.score),
           isWin,
           correctAnswersToAdd: localP.correctCount,
-        })
-          .then(({ position }) => {
-            setGlobalRankPosition(position);
-          })
-          .catch((err) => {
-            console.warn('Erro ao atualizar ranking no Supabase:', err);
-          });
+        }).catch((err) => {
+          console.warn('Erro ao atualizar ranking no Supabase:', err);
+        });
 
         saveMatchScore({
           player_id: localP.id,
