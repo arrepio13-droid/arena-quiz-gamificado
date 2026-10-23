@@ -277,6 +277,31 @@ export async function syncPlayerProfile(player: {
     return { player: { ...savedPlayer, position }, position };
   }
 
+  // 1.1 TENTAR VIA SERVIDOR BACKEND /api/player/sync
+  try {
+    const res = await fetch(`${API_BASE}/api/player/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: playerId,
+        nickname: cleanNick,
+        avatarId: player.avatarId,
+        titleBadge: player.titleBadge,
+        pointsToAdd: matchScore,
+        isWin: player.isWin,
+        correctAnswersToAdd: player.correctAnswersToAdd,
+      }),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.player && json.position) {
+        return json;
+      }
+    }
+  } catch {
+    // Falha de rede ou offline
+  }
+
   // 2. MODO LOCAL FALLBACK (offline)
   const list = getLocalLeaderboard();
   let existing = list.find((p) => p.id === playerId);
@@ -427,6 +452,16 @@ export async function saveMatchScore(scoreData: DbMatchScore): Promise<void> {
       rank_position: scoreData.rank_position,
     },
   });
+
+  try {
+    await fetch(`${API_BASE}/api/player/match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(scoreData),
+    });
+  } catch {
+    // ignore
+  }
 }
 
 /**
@@ -452,6 +487,26 @@ export async function fetchGlobalLeaderboard(limit = 20): Promise<DbPlayer[]> {
     return cleanData;
   }
 
-  // 2. Fallback cache local offline
+  // 2. TENTAR VIA SERVIDOR BACKEND /api/leaderboard CONECTADO AO SUPABASE
+  try {
+    const res = await fetch(`${API_BASE}/api/leaderboard?limit=${limit}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.players && Array.isArray(json.players) && json.players.length > 0) {
+        const cleanData = json.players
+          .filter((p: any) => p.nickname && p.nickname.toLowerCase() !== 'vcdssfga')
+          .map((item: any, idx: number) => ({
+            ...item,
+            position: item.position || idx + 1,
+          }));
+        saveLocalLeaderboard(cleanData);
+        return cleanData;
+      }
+    }
+  } catch {
+    // Falha de rede ou offline
+  }
+
+  // 3. Fallback cache local offline
   return getLocalLeaderboard().slice(0, limit);
 }

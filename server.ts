@@ -5,6 +5,7 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import os from 'os';
 import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
@@ -151,6 +152,26 @@ async function startServer() {
     res.json({ room: serializeRoom(room) });
   });
 
+  // Informações de rede local para permitir acesso de outros aparelhos (celulares) via Wi-Fi
+  app.get('/api/network-ip', (_req, res) => {
+    let localIp = 'localhost';
+    try {
+      const nets = os.networkInterfaces();
+      for (const name of Object.keys(nets)) {
+        for (const net of nets[name] || []) {
+          if (net.family === 'IPv4' && !net.internal) {
+            localIp = net.address;
+            break;
+          }
+        }
+        if (localIp !== 'localhost') break;
+      }
+    } catch {
+      // ignore
+    }
+    res.json({ ip: localIp, port: 3000 });
+  });
+
   // Supabase Leaderboard and User Ranking APIs
   app.get('/api/supabase-status', async (_req, res) => {
     res.json({
@@ -187,8 +208,12 @@ async function startServer() {
       const playerId = `player-${encodeURIComponent(cleanNick.toLowerCase())}`;
 
       // Remover entrada poluída de testes anteriores como vcdssfga
-      if (cleanNick.toLowerCase() !== 'vcdssfga') {
-        await supabase.from('players').delete().eq('nickname', 'vcdssfga').catch(() => {});
+      if (cleanNick.toLowerCase() !== 'vcdssfga' && supabase) {
+        try {
+          await supabase.from('players').delete().eq('nickname', 'vcdssfga');
+        } catch {
+          // ignore
+        }
       }
 
       const { data: existingPlayer } = await supabase

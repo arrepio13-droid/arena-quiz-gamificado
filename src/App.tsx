@@ -81,6 +81,21 @@ export default function App() {
   // WebSocket reference for real-time room sync
   const wsRef = useRef<WebSocket | null>(null);
   const localPlayerIdRef = useRef<string>(`player-${Math.random().toString(36).slice(2, 9)}`);
+  const [networkOrigin, setNetworkOrigin] = useState<string>(() => window.location.origin);
+
+  useEffect(() => {
+    // If accessing from localhost/127.0.0.1, query server for local Wi-Fi IP so phones can connect via QR code
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      fetch('/api/network-ip')
+        .then((r) => r.json())
+        .then((data) => {
+          if (data && data.ip && data.ip !== 'localhost' && data.ip !== '127.0.0.1') {
+            setNetworkOrigin(`http://${data.ip}:${data.port || 3000}`);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   // Sync document.body.dataset.state with Game State Machine
   useEffect(() => {
@@ -634,7 +649,7 @@ export default function App() {
     handleNextQuestion,
   ]);
 
-  const joinUrl = `${window.location.origin}/?pin=${selectedDeck.pin}&quiz=${selectedDeck.id}`;
+  const joinUrl = `${networkOrigin}/?pin=${selectedDeck.pin}&quiz=${selectedDeck.id}`;
   const currentQuestion =
     selectedDeck.questions[questionIndex] || selectedDeck.questions[0];
   const localPlayer =
