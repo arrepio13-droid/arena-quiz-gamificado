@@ -166,7 +166,7 @@ function getLocalLeaderboard(): DbPlayer[] {
   return [
     {
       id: 'bot-1',
-      nickname: 'CyberNinja',
+      nickname: 'Mestre Ninja',
       avatar_id: 'ninja',
       title_badge: 'Mestre dos Quizzes',
       total_score: 9450,

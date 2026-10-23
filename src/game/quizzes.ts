@@ -11,9 +11,9 @@ export interface AvatarDefinition {
 
 export const AVATARS: AvatarDefinition[] = [
   { id: 'fox', name: 'Raposa Ninja', bgHex: '#180B07', accentHex: '#EA580C', svgType: 'fox', imageUrl: '/avatars/fox.jpg' },
-  { id: 'ninja', name: 'Cyber Ninja', bgHex: '#081426', accentHex: '#38BDF8', svgType: 'robot', imageUrl: '/avatars/cyberninja.jpg' },
+  { id: 'ninja', name: 'Ninja Supremo', bgHex: '#081426', accentHex: '#38BDF8', svgType: 'robot', imageUrl: '/avatars/cyberninja.jpg' },
   { id: 'dragon', name: 'Dragão Gladiador', bgHex: '#271B11', accentHex: '#F59E0B', svgType: 'dragon', imageUrl: '/avatars/dragon.jpg' },
-  { id: 'astronaut', name: 'Panda', bgHex: '#141416', accentHex: '#E2E8F0', svgType: 'astronaut', imageUrl: '/avatars/panda.jpg' },
+  { id: 'astronaut', name: 'Astronauta', bgHex: '#0B132B', accentHex: '#60A5FA', svgType: 'astronaut', imageUrl: '/avatars/astronaut.jpg' },
   { id: 'owl', name: 'Coruja Guardiã', bgHex: '#1D1A16', accentHex: '#F59E0B', svgType: 'owl', imageUrl: '/avatars/owl.jpg' },
   { id: 'lightning', name: 'Guerreiro do Trovão', bgHex: '#08192E', accentHex: '#38BDF8', svgType: 'lightning', imageUrl: '/avatars/lightning.jpg' },
   { id: 'crown', name: 'Rainha da Realeza', bgHex: '#25151A', accentHex: '#F43F5E', svgType: 'crown', imageUrl: '/avatars/crown.jpg' },

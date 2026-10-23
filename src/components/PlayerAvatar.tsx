@@ -28,7 +28,9 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
   if (isImageAvatar) {
     const src =
       avatar.imageUrl ||
-      (avatarId === 'astronaut' || avatarId === 'panda'
+      (avatarId === 'astronaut'
+        ? '/avatars/astronaut.jpg'
+        : avatarId === 'panda'
         ? '/avatars/panda.jpg'
         : avatarId === 'tiger'
         ? '/avatars/tiger.jpg'
@@ -57,7 +59,9 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
       borderStyle = 'border-rose-500/50 bg-[#25151A] ring-1 ring-amber-400/30';
     } else if (avatarId === 'tiger') {
       borderStyle = 'border-orange-600/50 bg-[#1E1713] ring-1 ring-amber-500/30';
-    } else if (avatarId === 'astronaut' || avatarId === 'panda') {
+    } else if (avatarId === 'astronaut') {
+      borderStyle = 'border-sky-400/50 bg-[#0B132B] ring-1 ring-sky-300/30';
+    } else if (avatarId === 'panda') {
       borderStyle = 'border-slate-400/50 bg-[#141416] ring-1 ring-slate-300/30';
     }
 
