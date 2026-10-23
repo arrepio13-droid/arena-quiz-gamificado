@@ -48,9 +48,9 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Encontrar o jogador atual na lista (estritamente pelo apelido atual)
+  // Encontrar o participante atual na lista (pelo ID único ou apelido)
   const myPlayerEntry = players.find(
-    (p) => p.nickname && p.nickname.toLowerCase() === localPlayerNickname.toLowerCase()
+    (p) => (localPlayerId && p.id === localPlayerId) || (p.nickname && p.nickname.toLowerCase() === localPlayerNickname.toLowerCase())
   );
 
   const topThree = players.slice(0, 3);

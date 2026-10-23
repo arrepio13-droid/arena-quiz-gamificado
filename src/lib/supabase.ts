@@ -303,7 +303,7 @@ export async function registerPlayerEntry(player: {
 
 /**
  * Salva a pontuação do jogador no Supabase na nuvem.
- * Cada jogador usa um ID único (ex: player-8492) para NUNCA somar pontos com jogadores anteriores no mesmo aparelho.
+ * Cada participante usa um ID único para NUNCA somar pontos com jogadores anteriores ou tentativas passadas.
  */
 export async function syncPlayerProfile(player: {
   id: string;
@@ -316,7 +316,7 @@ export async function syncPlayerProfile(player: {
 }): Promise<{ player: DbPlayer; position: number }> {
   const cleanNick = (player.nickname || 'Jogador QR').trim();
   const matchScore = Math.round(Number(player.pointsToAdd) || 0);
-  const playerId = player.id || `player-${Math.floor(1000 + Math.random() * 9000)}`;
+  const playerId = player.id || `player-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
   // 1. TENTAR GRAVAR DIRETAMENTE NO SUPABASE NA NUVEM VIA REST
   const { data: upsertData, error } = await supabaseRest<DbPlayer[]>('players', {
@@ -378,7 +378,7 @@ export async function syncPlayerProfile(player: {
   let existing = list.find((p) => p.id === playerId);
 
   if (existing) {
-    existing.total_score = Math.max(existing.total_score, matchScore);
+    existing.total_score = matchScore; // PONTUAÇÃO DESSA TENTATIVA ÚNICA (NUNCA SOMAR)
     existing.nickname = cleanNick;
     existing.avatar_id = player.avatarId;
     existing.title_badge = player.titleBadge;
@@ -407,8 +407,7 @@ export async function syncPlayerProfile(player: {
 }
 
 /**
- * Sincroniza todos os participantes da partida no ranking (ex: Alceu, Você, Sr. Chuck)
- * diretamente no Supabase em tempo real para todos os aparelhos.
+ * Sincroniza a pontuação final da partida diretamente no Supabase em tempo real.
  */
 export async function syncMatchParticipants(
   participants: {
@@ -423,87 +422,45 @@ export async function syncMatchParticipants(
   }[]
 ): Promise<number> {
   const localP = participants.find((p) => p.isLocalPlayer);
+  if (!localP) return 1;
+
+  const cleanNick = (localP.nickname || '').trim();
+  const roundScore = Math.round(Number(localP.score) || 0);
 
   // 1. SINCRONIZAR DIRETAMENTE NO SUPABASE
   try {
-    for (const p of participants) {
-      const cleanNick = (p.nickname || '').trim();
-      if (!cleanNick || cleanNick.toLowerCase() === 'vcdssfga') continue;
-      const roundScore = Math.round(Number(p.score) || 0);
-
-      await supabaseRest('players', {
-        method: 'POST',
-        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-        body: {
-          id: p.id,
-          nickname: cleanNick,
-          avatar_id: p.avatarId,
-          title_badge: p.titleBadge,
-          total_score: roundScore,
-          matches_played: 1,
-          wins_count: p.currentRank === 1 ? 1 : 0,
-          correct_answers: Number(p.correctCount) || 0,
-          updated_at: new Date().toISOString(),
-        },
-      });
-    }
+    await supabaseRest('players', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: {
+        id: localP.id,
+        nickname: cleanNick,
+        avatar_id: localP.avatarId,
+        title_badge: localP.titleBadge,
+        total_score: roundScore,
+        matches_played: 1,
+        wins_count: localP.currentRank === 1 ? 1 : 0,
+        correct_answers: Number(localP.correctCount) || 0,
+        updated_at: new Date().toISOString(),
+      },
+    });
 
     // Buscar colocação no Supabase
-    if (localP) {
-      const { data: allRanked } = await supabaseRest<DbPlayer[]>('players?select=id,total_score&order=total_score.desc');
-      if (allRanked && Array.isArray(allRanked)) {
-        const idx = allRanked.findIndex((x) => x.id === localP.id);
-        if (idx !== -1) {
-          return idx + 1;
-        }
+    const { data: allRanked } = await supabaseRest<DbPlayer[]>('players?select=id,total_score&order=total_score.desc');
+    if (allRanked && Array.isArray(allRanked)) {
+      const idx = allRanked.findIndex((x) => x.id === localP.id);
+      if (idx !== -1) {
+        return idx + 1;
       }
     }
   } catch (err) {
-    console.warn('Erro ao sincronizar participantes no Supabase:', err);
+    console.warn('Erro ao sincronizar participante no Supabase:', err);
   }
 
-  // 2. FALLBACK LOCAL (se estiver offline)
-  const list = getLocalLeaderboard();
-  for (const p of participants) {
-    const cleanNick = (p.nickname || '').trim();
-    if (!cleanNick || cleanNick.toLowerCase() === 'vcdssfga') continue;
-
-    const roundScore = Math.round(Number(p.score) || 0);
-    let item = list.find((x) => x.id === p.id);
-
-    if (item) {
-      item.total_score = Math.max(item.total_score || 0, roundScore);
-      item.nickname = cleanNick;
-      item.avatar_id = p.avatarId;
-      item.title_badge = p.titleBadge;
-    } else {
-      item = {
-        id: p.id,
-        nickname: cleanNick,
-        avatar_id: p.avatarId,
-        title_badge: p.titleBadge,
-        total_score: roundScore,
-        matches_played: 1,
-        wins_count: p.currentRank === 1 ? 1 : 0,
-        correct_answers: Number(p.correctCount) || 0,
-      };
-      list.push(item);
-    }
-  }
-
-  list.sort((a, b) => b.total_score - a.total_score);
-  list.forEach((p, index) => {
-    p.position = index + 1;
-  });
-
-  saveLocalLeaderboard(list);
-
-  if (localP) {
-    const found = list.find((p) => p.id === localP.id);
-    return found?.position || localP.currentRank;
-  }
-  return 1;
+  return localP.currentRank;
 }
+
+
 
 /**
  * Salva a pontuação da partida no Supabase

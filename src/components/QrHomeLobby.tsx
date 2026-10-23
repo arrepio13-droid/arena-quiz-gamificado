@@ -128,7 +128,7 @@ export const QrHomeLobby: React.FC<QrHomeLobbyProps> = ({
               type="button"
               data-start="true"
               data-testid="scan-qr-primary-button"
-              onClick={() => onDirectQrReadToNickname(selectedDeck)}
+              onClick={() => onDirectQrReadToNickname(selectedDeck, playerCode)}
               className="w-full py-3.5 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
             >
               <QrCode className="w-5 h-5 shrink-0" />

@@ -32,7 +32,7 @@ export const NicknameScreen: React.FC<NicknameScreenProps> = ({
   onBackToHome,
   onConfirmJoin,
 }) => {
-  const [nickname, setNickname] = useState(initialNickname);
+  const [nickname, setNickname] = useState(() => (initialNickname === 'Jogador 1' ? '' : (initialNickname || '')));
   const [avatarId, setAvatarId] = useState(initialAvatarId || 'fox');
   const [titleBadge, setTitleBadge] = useState(initialTitleBadge || TITLE_BADGES[0]);
   const [playerCode, setPlayerCode] = useState(() => initialPlayerCode || Math.floor(1000 + Math.random() * 9000).toString());
@@ -227,6 +227,14 @@ export const NicknameScreen: React.FC<NicknameScreenProps> = ({
                 );
               })}
             </div>
+          </div>
+
+          {/* Aviso da regra oficial de 1 tentativa */}
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2.5 text-xs text-amber-200">
+            <span className="text-amber-400 font-bold text-base shrink-0">⚠️</span>
+            <span>
+              <strong>Regra Oficial da Arena:</strong> Cada participante só poderá responder <strong>1 vez</strong> o quiz. Sua pontuação será gravada de forma independente no ranking oficial.
+            </span>
           </div>
 
           {/* Submit & Launch directly into the Quiz */}

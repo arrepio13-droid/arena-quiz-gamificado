@@ -269,16 +269,16 @@ export default function App() {
 
   const startQuizSession = useCallback(
     (deck: QuizDeck, nickname: string, avatarId: string, titleBadge: string, code?: string) => {
+      // Gerar SEMPRE um ID único com timestamp para NUNCA somar nem sobrescrever outro participante
       const playerCode = code || Math.floor(1000 + Math.random() * 9000).toString();
-      const cleanNick = (nickname || 'Jogador QR').trim().replace(/\s*#\d+$/, '');
-      const fullNickname = `${cleanNick} #${playerCode}`;
-      const playerId = `player-${playerCode}`;
+      const cleanNick = (nickname || 'Jogador QR').trim();
+      const playerId = `player-${Date.now()}-${playerCode}`;
       localPlayerIdRef.current = playerId;
 
-      // REGISTRAR IMEDIATAMENTE NO BANCO SUPABASE PARA APARECER NO PAINEL NA HORA
+      // REGISTRAR IMEDIATAMENTE NO BANCO SUPABASE COMO NOVO PARTICIPANTE
       registerPlayerEntry({
         id: playerId,
-        nickname: fullNickname,
+        nickname: cleanNick,
         avatarId,
         titleBadge,
       }).catch((err) => {
@@ -286,10 +286,10 @@ export default function App() {
       });
 
       const firstQ = deck.questions[0];
-      const initialList = buildInitialParticipants(fullNickname, avatarId, titleBadge, playerId);
+      const initialList = buildInitialParticipants(cleanNick, avatarId, titleBadge, playerId);
 
       setSelectedDeck(deck);
-      setPlayerNickname(fullNickname);
+      setPlayerNickname(cleanNick);
       setPlayerAvatarId(avatarId);
       setPlayerTitleBadge(titleBadge);
       setParticipants(initialList);
@@ -502,8 +502,8 @@ export default function App() {
       soundEngine.playPodiumFanfare();
       const localP = participants.find((p) => p.isLocalPlayer);
       if (localP) {
-        setCareerXp((xp) => xp + Math.round(localP.score / 10) + localP.correctCount * 50);
-        setCareerMatches((m) => m + 1);
+        setCareerXp(Math.round(localP.score / 10) + localP.correctCount * 50);
+        setCareerMatches(1);
 
         // Sincronizar todos os participantes da partida para que o pódio e o ranking fiquem 100% alinhados
         syncMatchParticipants(participants)
@@ -887,15 +887,16 @@ export default function App() {
           globalPosition={globalRankPosition}
           onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
           onPlayAgain={() => {
-            const rawNick = playerNickname.replace(/\s*#\d+$/, '');
-            startQuizSession(
-              selectedDeck,
-              rawNick,
-              playerAvatarId,
-              playerTitleBadge
-            );
+            // Regra oficial: cada participante responde 1 vez. Volta ao lobby para novo participante
+            setPlayerNickname('');
+            setScannedPlayerCode('');
+            setFlowState('title');
           }}
-          onBackToQrLobby={() => setFlowState('title')}
+          onBackToQrLobby={() => {
+            setPlayerNickname('');
+            setScannedPlayerCode('');
+            setFlowState('title');
+          }}
         />
       )}
 

@@ -182,6 +182,10 @@ async function startServer() {
 
   app.get('/api/leaderboard', async (req, res) => {
     try {
+      if (!supabase) {
+        res.json({ players: [] });
+        return;
+      }
       const limit = Math.min(Number(req.query.limit) || 20, 20);
       const { data, error } = await supabase
         .from('player_rankings')
@@ -199,16 +203,35 @@ async function startServer() {
   app.post('/api/player/sync', async (req, res) => {
     try {
       const { id, nickname, avatarId, titleBadge, pointsToAdd, isWin, correctAnswersToAdd } = req.body || {};
-      if (!id || !nickname) {
-        res.status(400).json({ error: 'ID e Nickname são obrigatórios' });
+      if (!nickname) {
+        res.status(400).json({ error: 'Nickname é obrigatório' });
         return;
       }
 
       const cleanNick = String(nickname).trim();
-      const playerId = `player-${encodeURIComponent(cleanNick.toLowerCase())}`;
+      // Usar SEMPRE o ID único fornecido pelo cliente ou gerar um novo timestamped ID para nunca colidir
+      const playerId = String(id || `player-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`).trim();
+      const matchScore = Math.round(Number(pointsToAdd) || 0);
 
-      // Remover entrada poluída de testes anteriores como vcdssfga
-      if (cleanNick.toLowerCase() !== 'vcdssfga' && supabase) {
+      if (!supabase) {
+        res.json({
+          player: {
+            id: playerId,
+            nickname: cleanNick,
+            avatar_id: avatarId || 'fox',
+            title_badge: titleBadge || 'Competidor QR',
+            total_score: matchScore,
+            matches_played: 1,
+            wins_count: isWin ? 1 : 0,
+            correct_answers: Number(correctAnswersToAdd) || 0,
+          },
+          position: 1,
+        });
+        return;
+      }
+
+      // Remover entrada poluída de testes legados se houver
+      if (cleanNick.toLowerCase() !== 'vcdssfga') {
         try {
           await supabase.from('players').delete().eq('nickname', 'vcdssfga');
         } catch {
@@ -216,40 +239,36 @@ async function startServer() {
         }
       }
 
+      // Verificar se este ID ESPECÍFICO deste participante já foi registrado (ex: na entrada com score 0)
       const { data: existingPlayer } = await supabase
         .from('players')
         .select('*')
-        .ilike('nickname', cleanNick)
+        .eq('id', playerId)
         .maybeSingle();
 
       let updatedPlayer;
       if (existingPlayer) {
-        // Recorde da partida para não somar pontos com outros participantes
-        const matchScore = Number(pointsToAdd) || 0;
-        const newScore = Math.max(existingPlayer.total_score || 0, matchScore);
-        const newMatches = (existingPlayer.matches_played || 0) + 1;
-        const newWins = (existingPlayer.wins_count || 0) + (isWin ? 1 : 0);
-        const newCorrect = (existingPlayer.correct_answers || 0) + (Number(correctAnswersToAdd) || 0);
-
+        // Atualizar APENAS a pontuação desta tentativa do participante (NUNCA somar com outros)
         const { data, error } = await supabase
           .from('players')
           .update({
             nickname: cleanNick,
-            avatar_id: avatarId || 'fox',
-            title_badge: titleBadge || 'Competidor QR',
-            total_score: newScore,
-            matches_played: newMatches,
-            wins_count: newWins,
-            correct_answers: newCorrect,
+            avatar_id: avatarId || existingPlayer.avatar_id || 'fox',
+            title_badge: titleBadge || existingPlayer.title_badge || 'Competidor QR',
+            total_score: matchScore,
+            matches_played: 1,
+            wins_count: isWin ? 1 : 0,
+            correct_answers: Number(correctAnswersToAdd) || 0,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', existingPlayer.id)
+          .eq('id', playerId)
           .select()
           .single();
 
         if (error) throw error;
         updatedPlayer = data;
       } else {
+        // Inserir como NOVO participante isolado no banco de dados
         const { data, error } = await supabase
           .from('players')
           .insert({
@@ -257,7 +276,7 @@ async function startServer() {
             nickname: cleanNick,
             avatar_id: avatarId || 'fox',
             title_badge: titleBadge || 'Competidor QR',
-            total_score: Number(pointsToAdd) || 0,
+            total_score: matchScore,
             matches_played: 1,
             wins_count: isWin ? 1 : 0,
             correct_answers: Number(correctAnswersToAdd) || 0,
@@ -269,22 +288,31 @@ async function startServer() {
         updatedPlayer = data;
       }
 
-      // Calcular posição no ranking
-      const { count } = await supabase
+      // Calcular posição exata no ranking
+      const { data: allPlayers } = await supabase
         .from('players')
-        .select('id', { count: 'exact', head: true })
-        .gt('total_score', updatedPlayer.total_score);
+        .select('id, total_score')
+        .order('total_score', { ascending: false });
 
-      const position = (count ?? 0) + 1;
+      let position = 1;
+      if (allPlayers && Array.isArray(allPlayers)) {
+        const idx = allPlayers.findIndex((p) => p.id === playerId);
+        position = idx !== -1 ? idx + 1 : 1;
+      }
+
       res.json({ player: updatedPlayer, position });
     } catch (err: any) {
-      console.error('Erro na API /api/player/sync:', err);
-      res.status(500).json({ error: err.message || 'Erro ao sincronizar jogador no Supabase' });
+      console.error('Erro em /api/player/sync:', err);
+      res.status(500).json({ error: err.message || 'Erro ao sincronizar jogador' });
     }
   });
 
   app.post('/api/player/match', async (req, res) => {
     try {
+      if (!supabase) {
+        res.json({ success: true });
+        return;
+      }
       const { player_id, nickname, avatar_id, quiz_id, quiz_title, score, correct_count, total_questions, rank_position } = req.body || {};
       const { error } = await supabase.from('match_scores').insert({
         player_id,

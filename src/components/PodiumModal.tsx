@@ -60,12 +60,21 @@ export const PodiumModal: React.FC<PodiumModalProps> = ({
                 ? `Vitória Épica, ${localPlayer.nickname}!`
                 : `Resultado Final — #${localPlayer.currentRank}º Lugar`}
             </h1>
-            {globalPosition && (
-              <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 text-xs font-bold">
-                <Award className="w-4 h-4 text-amber-400" />
-                <span>Sua Posição Global no Banco de Dados: <strong className="text-amber-300">#{globalPosition}º Lugar</strong></span>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-bold">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Tentativa Única Oficial Registrada: <strong className="text-white">{Math.round(localPlayer.score).toLocaleString()} pts</strong></span>
               </div>
-            )}
+              {globalPosition && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 text-xs font-bold">
+                  <Award className="w-4 h-4 text-amber-400" />
+                  <span>Posição Global no Banco: <strong className="text-amber-300">#{globalPosition}º Lugar</strong></span>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-cyan-100/70 mt-2">
+              Cada participante responde 1 vez ao quiz. Para jogar novamente, registre um novo participante.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
@@ -134,37 +143,28 @@ export const PodiumModal: React.FC<PodiumModalProps> = ({
             </div>
           </div>
 
-          {/* Primary Action CTAs (matches "Reiniciar" & "Descobrir quizzes" from the video) */}
+          {/* Primary Action CTAs */}
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <button
               type="button"
               data-start="true"
-              onClick={onPlayAgain}
-              className="w-full sm:w-auto px-6 py-3.5 rounded-lg bg-transparent hover:bg-white/10 border-2 border-white text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              onClick={onBackToQrLobby}
+              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
             >
-              <RotateCcw className="w-4 h-4 shrink-0" />
-              <span>Reiniciar</span>
+              <Compass className="w-4 h-4 shrink-0" />
+              <span>Novo Participante (Novo QR Code)</span>
             </button>
 
             {onOpenLeaderboard && (
               <button
                 type="button"
                 onClick={onOpenLeaderboard}
-                className="w-full sm:w-auto px-6 py-3.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
               >
                 <Trophy className="w-4 h-4 shrink-0" />
-                <span>Ranking & Posições</span>
+                <span>Ver Ranking & Posições</span>
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={onBackToQrLobby}
-              className="w-full sm:w-auto px-6 py-3.5 rounded-lg bg-white hover:bg-slate-100 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
-            >
-              <Compass className="w-4 h-4 text-slate-900 shrink-0" />
-              <span>Descobrir quizzes · Arena Quiz</span>
-            </button>
           </div>
         </div>
 
