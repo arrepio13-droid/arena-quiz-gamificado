@@ -91,9 +91,9 @@ export default function App() {
 
   // Build initial participants list (local player + competitive rivals)
   const buildInitialParticipants = useCallback(
-    (nick: string, avId: string, badge: string): PlayerParticipant[] => {
+    (nick: string, avId: string, badge: string, customId?: string): PlayerParticipant[] => {
       const cleanNick = (nick || 'JogadorQR').trim();
-      const playerId = `player-${encodeURIComponent(cleanNick.toLowerCase())}`;
+      const playerId = customId || `player-${Math.floor(1000 + Math.random() * 9000)}`;
       localPlayerIdRef.current = playerId;
 
       const local: PlayerParticipant = {
@@ -247,12 +247,18 @@ export default function App() {
   }, []);
 
   const startQuizSession = useCallback(
-    (deck: QuizDeck, nickname: string, avatarId: string, titleBadge: string) => {
+    (deck: QuizDeck, nickname: string, avatarId: string, titleBadge: string, code?: string) => {
+      const playerCode = code || Math.floor(1000 + Math.random() * 9000).toString();
+      const cleanNick = (nickname || 'Jogador QR').trim().replace(/\s*#\d+$/, '');
+      const fullNickname = `${cleanNick} #${playerCode}`;
+      const playerId = `player-${playerCode}`;
+      localPlayerIdRef.current = playerId;
+
       const firstQ = deck.questions[0];
-      const initialList = buildInitialParticipants(nickname, avatarId, titleBadge);
+      const initialList = buildInitialParticipants(fullNickname, avatarId, titleBadge, playerId);
 
       setSelectedDeck(deck);
-      setPlayerNickname(nickname);
+      setPlayerNickname(fullNickname);
       setPlayerAvatarId(avatarId);
       setPlayerTitleBadge(titleBadge);
       setParticipants(initialList);
@@ -721,9 +727,9 @@ export default function App() {
           initialTitleBadge={playerTitleBadge}
           connectedPlayersCount={RIVAL_BOTS.length + 1}
           onBackToHome={() => setFlowState('title')}
-          onConfirmJoin={(nickname, avatarId, titleBadge) => {
+          onConfirmJoin={(nickname, avatarId, titleBadge, playerCode) => {
             soundEngine.playQrScanSuccess();
-            startQuizSession(selectedDeck, nickname, avatarId, titleBadge);
+            startQuizSession(selectedDeck, nickname, avatarId, titleBadge, playerCode);
           }}
         />
       )}
@@ -847,14 +853,15 @@ export default function App() {
           answerHistory={answerHistory}
           globalPosition={globalRankPosition}
           onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
-          onPlayAgain={() =>
+          onPlayAgain={() => {
+            const rawNick = playerNickname.replace(/\s*#\d+$/, '');
             startQuizSession(
               selectedDeck,
-              playerNickname,
+              rawNick,
               playerAvatarId,
               playerTitleBadge
-            )
-          }
+            );
+          }}
           onBackToQrLobby={() => setFlowState('title')}
         />
       )}

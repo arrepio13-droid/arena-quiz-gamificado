@@ -11,7 +11,7 @@ interface NicknameScreenProps {
   initialTitleBadge: string;
   connectedPlayersCount: number;
   onBackToHome: () => void;
-  onConfirmJoin: (nickname: string, avatarId: string, titleBadge: string) => void;
+  onConfirmJoin: (nickname: string, avatarId: string, titleBadge: string, playerCode: string) => void;
 }
 
 const TITLE_BADGES = [
@@ -33,6 +33,7 @@ export const NicknameScreen: React.FC<NicknameScreenProps> = ({
   const [nickname, setNickname] = useState(initialNickname);
   const [avatarId, setAvatarId] = useState(initialAvatarId || 'fox');
   const [titleBadge, setTitleBadge] = useState(initialTitleBadge || TITLE_BADGES[0]);
+  const [playerCode, setPlayerCode] = useState(() => Math.floor(1000 + Math.random() * 9000).toString());
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleRandomNickname = () => {
@@ -50,7 +51,7 @@ export const NicknameScreen: React.FC<NicknameScreenProps> = ({
       return;
     }
     setErrorMsg(null);
-    onConfirmJoin(validation.cleaned, avatarId, titleBadge);
+    onConfirmJoin(validation.cleaned, avatarId, titleBadge, playerCode);
   };
 
   return (
@@ -148,6 +149,25 @@ export const NicknameScreen: React.FC<NicknameScreenProps> = ({
                 {errorMsg}
               </p>
             )}
+
+            {/* Código Único do Jogador / Partida */}
+            <div className="mt-3 flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-medium">Seu Código Único nesta Partida:</span>
+                <span className="font-mono text-xs font-black text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/30">
+                  #{playerCode}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlayerCode(Math.floor(1000 + Math.random() * 9000).toString())}
+                className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer flex items-center gap-1"
+                title="Sortear outro código de partida"
+              >
+                <Dices className="w-3.5 h-3.5" />
+                <span>Novo Código</span>
+              </button>
+            </div>
           </div>
 
           {/* Avatar Selection */}
