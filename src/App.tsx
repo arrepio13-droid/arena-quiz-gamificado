@@ -21,7 +21,7 @@ import { PodiumModal } from './components/PodiumModal';
 import { QuizCreatorModal } from './components/QuizCreatorModal';
 import { HostPresenterModal } from './components/HostPresenterModal';
 import { LeaderboardModal } from './components/LeaderboardModal';
-import { syncPlayerProfile, syncMatchParticipants, saveMatchScore } from './lib/supabase';
+import { syncPlayerProfile, syncMatchParticipants, saveMatchScore, registerPlayerEntry } from './lib/supabase';
 
 type AppFlowState = 'title' | 'nickname' | 'playing' | 'paused' | 'gameover';
 
@@ -29,6 +29,7 @@ export default function App() {
   const [decks, setDecks] = useState<QuizDeck[]>(INITIAL_QUIZ_DECKS);
   const [selectedDeck, setSelectedDeck] = useState<QuizDeck>(INITIAL_QUIZ_DECKS[0]);
   const [flowState, setFlowState] = useState<AppFlowState>('title');
+  const [scannedPlayerCode, setScannedPlayerCode] = useState<string>('');
   const [showSplash, setShowSplash] = useState<boolean>(() => {
     const params = new URLSearchParams(window.location.search);
     return !params.get('pin') && !params.get('quiz') && !params.get('autostart') && !params.get('nosplash');
@@ -250,10 +251,15 @@ export default function App() {
       }
     }
 
+    const codeParam = params.get('code') || params.get('playerCode');
+    if (codeParam) {
+      setScannedPlayerCode(codeParam.trim());
+    }
+
     if (autostart === '1') {
       const defaultNick = 'JogadorQR';
       setPlayerNickname(defaultNick);
-      startQuizSession(targetDeck, defaultNick, 'fox', 'Velocista QR');
+      startQuizSession(targetDeck, defaultNick, 'fox', 'Velocista QR', codeParam || undefined);
     } else if (pinParam || quizParam) {
       // Scanned QR URL -> take player straight to Nickname Input screen!
       setFlowState('nickname');
@@ -268,6 +274,16 @@ export default function App() {
       const fullNickname = `${cleanNick} #${playerCode}`;
       const playerId = `player-${playerCode}`;
       localPlayerIdRef.current = playerId;
+
+      // REGISTRAR IMEDIATAMENTE NO BANCO SUPABASE PARA APARECER NO PAINEL NA HORA
+      registerPlayerEntry({
+        id: playerId,
+        nickname: fullNickname,
+        avatarId,
+        titleBadge,
+      }).catch((err) => {
+        console.warn('Erro ao registrar entrada no Supabase:', err);
+      });
 
       const firstQ = deck.questions[0];
       const initialList = buildInitialParticipants(fullNickname, avatarId, titleBadge, playerId);
@@ -678,8 +694,9 @@ export default function App() {
                 careerXp={careerXp}
                 careerMatches={careerMatches}
                 onSelectDeck={(deck) => setSelectedDeck(deck)}
-                onDirectQrReadToNickname={(deck) => {
+                onDirectQrReadToNickname={(deck, code) => {
                   setSelectedDeck(deck);
+                  if (code) setScannedPlayerCode(code);
                   soundEngine.playQrScanSuccess();
                   setFlowState('nickname');
                 }}
@@ -740,6 +757,7 @@ export default function App() {
           initialNickname={playerNickname}
           initialAvatarId={playerAvatarId}
           initialTitleBadge={playerTitleBadge}
+          initialPlayerCode={scannedPlayerCode}
           connectedPlayersCount={RIVAL_BOTS.length + 1}
           onBackToHome={() => setFlowState('title')}
           onConfirmJoin={(nickname, avatarId, titleBadge, playerCode) => {

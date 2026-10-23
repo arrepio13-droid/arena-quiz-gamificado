@@ -37,21 +37,23 @@ export const API_BASE = (import.meta.env.VITE_API_URL || '').trim().replace(/\/$
 
 // Credenciais padrão da nuvem Supabase (codificadas em Base64 para garantir conexão universal em todos os celulares)
 export function getSupabaseCredentials(): { url: string; anonKey: string } {
-  const envUrl = normalizeSupabaseUrl(
-    import.meta.env.VITE_SUPABASE_URL || 'https://ioxeqobrutxbakhexgor.supabase.co'
-  );
+  const defaultUrl = 'https://ioxeqobrutxbakhexgor.supabase.co';
   const defaultKey = typeof atob === 'function'
     ? atob('c2Jfc2VjcmV0X0FDVFhicjhHeXhMOW5KNlUtNGh0T0FfaDREY3ZmeWM=')
     : '';
-  const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || defaultKey).trim();
 
+  const envUrl = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL || defaultUrl) || defaultUrl;
+  const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || defaultKey).trim() || defaultKey;
+
+  // Limpar configurações legadas de mock do localStorage se existirem
   try {
     const saved = localStorage.getItem('ARENA_QUIZ_SUPABASE_CONFIG');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed.url && parsed.anonKey) {
+      if (parsed.url && parsed.anonKey && parsed.url.includes('ioxeqobrutxbakhexgor')) {
         return { url: normalizeSupabaseUrl(parsed.url), anonKey: parsed.anonKey.trim() };
       }
+      localStorage.removeItem('ARENA_QUIZ_SUPABASE_CONFIG');
     }
   } catch {
     // Ignore JSON parse errors
@@ -153,11 +155,13 @@ function getLocalLeaderboard(): DbPlayer[] {
     const data = localStorage.getItem(LOCAL_LEADERBOARD_KEY);
     if (data) {
       let parsed: DbPlayer[] = JSON.parse(data);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         parsed = parsed.filter(
           (p) => p.nickname && p.nickname.toLowerCase() !== 'vcdssfga' && !p.nickname.toLowerCase().includes('vcdss')
         );
-        return parsed;
+        if (parsed.length > 0) {
+          return parsed;
+        }
       }
     }
   } catch {
@@ -227,6 +231,73 @@ function saveLocalLeaderboard(list: DbPlayer[]) {
     localStorage.setItem(LOCAL_LEADERBOARD_KEY, JSON.stringify(list));
   } catch {
     // ignore
+  }
+}
+
+/**
+ * Registra o jogador no banco de dados Supabase imediatamente ao entrar na sala / confirmar apelido.
+ * Garante que o usuário apareça instantaneamente no banco de dados mesmo antes de terminar o quiz.
+ */
+export async function registerPlayerEntry(player: {
+  id: string;
+  nickname: string;
+  avatarId: string;
+  titleBadge: string;
+}): Promise<void> {
+  const cleanNick = (player.nickname || 'Jogador QR').trim();
+  const playerId = player.id;
+
+  // 1. Gravar imediatamente no Supabase via REST
+  await supabaseRest('players', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: {
+      id: playerId,
+      nickname: cleanNick,
+      avatar_id: player.avatarId,
+      title_badge: player.titleBadge,
+      total_score: 0,
+      matches_played: 0,
+      wins_count: 0,
+      correct_answers: 0,
+      updated_at: new Date().toISOString(),
+    },
+  });
+
+  // 2. Notificar servidor local se disponível
+  try {
+    await fetch(`${API_BASE}/api/player/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: playerId,
+        nickname: cleanNick,
+        avatarId: player.avatarId,
+        titleBadge: player.titleBadge,
+        pointsToAdd: 0,
+        isWin: false,
+        correctAnswersToAdd: 0,
+      }),
+    });
+  } catch {
+    // ignore
+  }
+
+  // 3. Atualizar cache local
+  const list = getLocalLeaderboard();
+  let existing = list.find((p) => p.id === playerId);
+  if (!existing) {
+    list.push({
+      id: playerId,
+      nickname: cleanNick,
+      avatar_id: player.avatarId,
+      title_badge: player.titleBadge,
+      total_score: 0,
+      matches_played: 0,
+      wins_count: 0,
+      correct_answers: 0,
+    });
+    saveLocalLeaderboard(list);
   }
 }
 

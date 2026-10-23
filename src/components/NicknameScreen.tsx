@@ -9,6 +9,7 @@ interface NicknameScreenProps {
   initialNickname: string;
   initialAvatarId: string;
   initialTitleBadge: string;
+  initialPlayerCode?: string;
   connectedPlayersCount: number;
   onBackToHome: () => void;
   onConfirmJoin: (nickname: string, avatarId: string, titleBadge: string, playerCode: string) => void;
@@ -26,6 +27,7 @@ export const NicknameScreen: React.FC<NicknameScreenProps> = ({
   initialNickname,
   initialAvatarId,
   initialTitleBadge,
+  initialPlayerCode,
   connectedPlayersCount,
   onBackToHome,
   onConfirmJoin,
@@ -33,7 +35,7 @@ export const NicknameScreen: React.FC<NicknameScreenProps> = ({
   const [nickname, setNickname] = useState(initialNickname);
   const [avatarId, setAvatarId] = useState(initialAvatarId || 'fox');
   const [titleBadge, setTitleBadge] = useState(initialTitleBadge || TITLE_BADGES[0]);
-  const [playerCode, setPlayerCode] = useState(() => Math.floor(1000 + Math.random() * 9000).toString());
+  const [playerCode, setPlayerCode] = useState(() => initialPlayerCode || Math.floor(1000 + Math.random() * 9000).toString());
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleRandomNickname = () => {
