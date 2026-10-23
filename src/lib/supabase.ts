@@ -49,8 +49,19 @@ export function getSupabaseCredentials(): { url: string; anonKey: string } {
     // ignore
   }
 
-  const envUrl = normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL || CLOUD_SUPABASE_URL) || CLOUD_SUPABASE_URL;
-  const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || CLOUD_SUPABASE_KEY).trim() || CLOUD_SUPABASE_KEY;
+  const envUrl = normalizeSupabaseUrl(
+    (import.meta.env.VITE_SUPABASE_URL as string) ||
+    (import.meta.env.SUPABASE_URL as string) ||
+    (import.meta.env.NEXT_PUBLIC_SUPABASE_URL as string) ||
+    CLOUD_SUPABASE_URL
+  ) || CLOUD_SUPABASE_URL;
+
+  const envKey = (
+    (import.meta.env.VITE_SUPABASE_ANON_KEY as string) ||
+    (import.meta.env.SUPABASE_ANON_KEY as string) ||
+    (import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string) ||
+    CLOUD_SUPABASE_KEY
+  ).trim() || CLOUD_SUPABASE_KEY;
 
   return { url: envUrl, anonKey: envKey };
 }
@@ -246,11 +257,13 @@ export async function registerPlayerEntry(player: {
   try {
     const supabase = getSupabaseClient();
     if (supabase) {
+      const avatarId = player.avatarId || 'fox';
+      const titleBadge = player.titleBadge || 'Competidor QR';
       const { error } = await supabase.from('players').upsert({
         id: playerId,
         nickname: cleanNick,
-        avatar_id: player.avatarId,
-        title_badge: player.titleBadge,
+        avatar_id: avatarId,
+        title_badge: titleBadge,
         total_score: 0,
         matches_played: 0,
         wins_count: 0,
@@ -266,14 +279,16 @@ export async function registerPlayerEntry(player: {
   }
 
   // 1.1 Gravação adicional via REST
+  const avatarId = player.avatarId || 'fox';
+  const titleBadge = player.titleBadge || 'Competidor QR';
   await supabaseRest('players', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
     body: {
       id: playerId,
       nickname: cleanNick,
-      avatar_id: player.avatarId,
-      title_badge: player.titleBadge,
+      avatar_id: avatarId,
+      title_badge: titleBadge,
       total_score: 0,
       matches_played: 0,
       wins_count: 0,
@@ -338,6 +353,9 @@ export async function syncPlayerProfile(player: {
   const matchScore = Math.round(Number(player.pointsToAdd) || 0);
   const playerId = player.id || `player-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+  const avatarId = player.avatarId || 'fox';
+  const titleBadge = player.titleBadge || 'Competidor QR';
+
   // 1. Tentar via Cliente Oficial Supabase
   try {
     const supabase = getSupabaseClient();
@@ -347,8 +365,8 @@ export async function syncPlayerProfile(player: {
         .upsert({
           id: playerId,
           nickname: cleanNick,
-          avatar_id: player.avatarId,
-          title_badge: player.titleBadge,
+          avatar_id: avatarId,
+          title_badge: titleBadge,
           total_score: matchScore,
           matches_played: 1,
           wins_count: player.isWin ? 1 : 0,
@@ -383,8 +401,8 @@ export async function syncPlayerProfile(player: {
     body: {
       id: playerId,
       nickname: cleanNick,
-      avatar_id: player.avatarId,
-      title_badge: player.titleBadge,
+      avatar_id: avatarId,
+      title_badge: titleBadge,
       total_score: matchScore,
       matches_played: 1,
       wins_count: player.isWin ? 1 : 0,
@@ -555,13 +573,14 @@ export async function syncMatchParticipants(
  * Salva a pontuação da partida no Supabase
  */
 export async function saveMatchScore(scoreData: DbMatchScore): Promise<void> {
+  const avatarId = scoreData.avatar_id || 'fox';
   try {
     const supabase = getSupabaseClient();
     if (supabase) {
       await supabase.from('match_scores').insert({
         player_id: scoreData.player_id,
         nickname: scoreData.nickname,
-        avatar_id: scoreData.avatar_id,
+        avatar_id: avatarId,
         quiz_id: scoreData.quiz_id,
         quiz_title: scoreData.quiz_title,
         score: scoreData.score,
@@ -569,6 +588,7 @@ export async function saveMatchScore(scoreData: DbMatchScore): Promise<void> {
         total_questions: scoreData.total_questions,
         rank_position: scoreData.rank_position,
       });
+      return;
     }
   } catch (err) {
     console.warn('Erro ao salvar match_score via supabase-js:', err);
@@ -579,7 +599,7 @@ export async function saveMatchScore(scoreData: DbMatchScore): Promise<void> {
     body: {
       player_id: scoreData.player_id,
       nickname: scoreData.nickname,
-      avatar_id: scoreData.avatar_id,
+      avatar_id: avatarId,
       quiz_id: scoreData.quiz_id,
       quiz_title: scoreData.quiz_title,
       score: scoreData.score,
